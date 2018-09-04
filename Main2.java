@@ -25,14 +25,9 @@ import net.dv8tion.jda.core.requests.restaction.AuditableRestAction;
 public class Main2 extends ListenerAdapter{
 	
 	//der Name der Rolle die zugewiesen wird
-	public static String fisi_role_name = "FISI";
-	public static String fiae_role_name = "FIAE";
-	public static String itk_role_name = "ITK";
-	public static String grp1_name = "US_IT-33.1";
-	public static String grp2_name = "US_IT-33.2";
-	public static String grp3_name = "US_IT-34.1";
-	public static String grp4_name = "US_IT-34.2";
-	public static String grp5_name = "US_IT-34.3";
+	public static String[] role_names = {"FISI", "FIAE", "ITK"};
+
+	public static String[] grp_names = {"US_IT-33.1", "US_IT-33.2", "US_IT-34.1", "US_IT-34.2", "US_IT-34.3"};
 	
 	public static String[] kommandos = {"Name", "Fachrichtung", "Gruppe", "Standort", "Info"};
 	
@@ -68,6 +63,7 @@ public class Main2 extends ListenerAdapter{
 			return;
 		}
 		
+		//simple Kommando Regex 
 		String cmdStr = "(";
 		
 		for (String cmds : kommandos) {
@@ -76,17 +72,13 @@ public class Main2 extends ListenerAdapter{
 		}
 		
 		String test = "^!" + cmdStr.substring(0, cmdStr.length()-1) + ")=?(.*)";
-		
-		System.out.print(test);
-		
-		
 		Pattern CMD = Pattern.compile(test);
-		
 		Matcher CMDmatcher = CMD.matcher(command.trim());
 		
-		//Test ob Bot Kommando auswerten kann/muss
+		//Test ob Bot simple Kommando auswerten kann/muss
 		if(CMDmatcher.find()) {
 		
+			//Kommandoauswertung
 			switch (CMDmatcher.group(1)) {
 			
 			case "Name":
@@ -100,6 +92,8 @@ public class Main2 extends ListenerAdapter{
 			case "Gruppe":
 		
 				setRole(controller, event, CMDmatcher.group(2).trim());
+				
+				event.getGuild().getDefaultChannel().sendMessage(event.getAuthor().getName() + " ist nun " + CMDmatcher.group(2).trim()).queue();
 				
 				break;
 	
@@ -121,56 +115,63 @@ public class Main2 extends ListenerAdapter{
 		
 		}
 		
-		Pattern regex = Pattern.compile("[\\s]*!([A-z]+[\\s]+[A-z]+)[\\s]+!(" + 
-				fisi_role_name + "|" + 
-				fiae_role_name + "|" +
-				itk_role_name +
-				")[\\s]+!(" + 
-				grp1_name + "|" + 
-				grp2_name + "|" +
-				grp3_name + "|" +
-				grp4_name + "|" +
-				grp5_name +
-				")[\\s]+!([A-z]+)[\\s]*");
+		//complexe Kommando regex
+		String complexCMDreg = "[\\s]*!([A-z]+[\\s]+[A-z]+)[\\s]+!(";
+		String role_nameStr = "";
+		String group_nameStr = "";
 		
-		Matcher matcher = regex.matcher(command);
-		
-		if(!matcher.matches()) {
+		for (String string : role_names) {
 			
-			System.out.println("Nachricht von " +
-					event.getAuthor().getName() + ", " + command );
+			role_nameStr = role_nameStr + string + "|";
 			
-			return;
 		}
 		
-		String[] commands = new String[4];
+		complexCMDreg = complexCMDreg + role_nameStr.substring(0, role_nameStr.length()-1) + ")[\\s]+!(";
+				
+		for (String string : grp_names) {
+			
+			group_nameStr = group_nameStr + string + "|";
+			
+		}
+			
+		complexCMDreg = complexCMDreg + group_nameStr.substring(0, group_nameStr.length()-1) + ")[\\s]+!([A-z]+)[\\s]*";
 		
-		commands[0] = (matcher.group(1));
-		commands[1] = (matcher.group(2));
-		commands[2] = (matcher.group(3));
-		commands[3] = (matcher.group(4));
+		Pattern regex = Pattern.compile(complexCMDreg);
+		Matcher matcher = regex.matcher(command);
 		
-		System.out.println("Nachricht von " +
-				"Name :" + commands[0] + " Ausbildung :" + commands[1] + " Gruppe  :" + commands[2] + " Standort  :" + commands[3] );
+		//Test ob Bot komplexe Kommando auswerten kann/muss
+		if(!matcher.matches()) {
+			
+			String[] commands = new String[4];
+			
+			commands[0] = (matcher.group(1));
+			commands[1] = (matcher.group(2));
+			commands[2] = (matcher.group(3));
+			commands[3] = (matcher.group(4));
+			
+			System.out.println("Nachricht von " +
+					"Name :" + commands[0] + " Ausbildung :" + commands[1] + " Gruppe  :" + commands[2] + " Standort  :" + commands[3] );
+			
+			//Eigenschaften setzen 
+			controller.setNickname(event.getMember(), 
+					commands[0] +  "/" + commands[3]).queue();
+			System.out.println("Name vergeben");
 		
-		//Eigenschaften setzen 
-		controller.setNickname(event.getMember(), 
-				commands[0] +  "/" + commands[3]).queue();
-		System.out.println("Name vergeben");
-	
-		//Rollen setzen - TODO funktioniert ? zwei Rollenvergaben in einem circle
-		setRole(controller, event, commands[1]);
-		setRole(controller, event, commands[2]);
-		 
-		//Allchat Meldung
-		 event.getGuild().getDefaultChannel().sendMessage(commands[0] + "ist in der Gruppe " + commands[2] + " lernt " +
-				 ((commands[1].equals(fisi_role_name)) ? "Fachinformatiker für Systemintegration" : (command.equals(fiae_role_name) ? "Fachinformatiker für Anwendungsentwicklung" : "IT Systemkaufmann")) +  
-				 " am Standort " + commands[3] + 
-				 " und ist dem Server gejoined.").queue();
-		 
-		 //persönliche Rückmeldung
-		 event.getAuthor().openPrivateChannel().queue((channel) -> 
-		 	channel.sendMessage(event.getAuthor().getName() + ", du wurdest zugewiesen. Viel Spaß!").queue() );
+			//Rollen setzen - TODO funktioniert ? zwei Rollenvergaben in einem circle
+			setRole(controller, event, commands[1]);
+			setRole(controller, event, commands[2]);
+			 
+			//Allchat Meldung
+			 event.getGuild().getDefaultChannel().sendMessage(commands[0] + "ist in der Gruppe " + commands[2] + " lernt " +
+					 ((commands[1].equals(role_names[0])) ? "Fachinformatiker für Systemintegration" : (command.equals(role_names[1]) ? "Fachinformatiker für Anwendungsentwicklung" : "IT Systemkaufmann")) +  
+					 " am Standort " + commands[3] + 
+					 " und ist dem Server gejoined.").queue();
+			 
+			 //persönliche Rückmeldung
+			 event.getAuthor().openPrivateChannel().queue((channel) -> 
+			 	channel.sendMessage(event.getAuthor().getName() + ", du wurdest zugewiesen. Viel Spaß!").queue() );
+		}
+		
 		 
 	}
 	
@@ -188,6 +189,13 @@ public class Main2 extends ListenerAdapter{
 		
 	}
 	 
+	/**
+	 * spezielle Rollenvergabe um mehrere Rollen pro User sinnvoll zu handlen
+	 * 
+	 * @param controller
+	 * @param event
+	 * @param role_cmd
+	 */
 	public void setRole( GuildController controller, MessageReceivedEvent event, String role_cmd) {
 		
 		net.dv8tion.jda.core.entities.Member member = event.getMember();
@@ -195,6 +203,7 @@ public class Main2 extends ListenerAdapter{
 		
 		AuditableRestAction<Void> request = null;
 		
+		//Test auf Rollen in Besitz des Users
 		if(role_cmd.equals("FISI") || role_cmd.equals("FIAE") || role_cmd.equals("ITK")) {
 		
 			for (Role role : memberRoles) {
@@ -203,6 +212,7 @@ public class Main2 extends ListenerAdapter{
 				
 				if(name.equals(role_cmd)) return;
 				
+				//Rollenänderung bei verwandter Rolle
 				if(name.equals("Systemintegrator") || name.equals("Anwendungsentwickler") || name.equals("IT Systemkaufmann")) {
 					
 					request = controller.modifyMemberRoles(member, getRolebyCMD(event, role_cmd), role);
@@ -225,6 +235,7 @@ public class Main2 extends ListenerAdapter{
 				
 				if(name.equals(role_cmd)) return;
 				
+				//Rollenänderung bei verwandter Rolle
 				if(name.equals("US_IT-33.1") || name.equals("US_IT-33.2") || name.equals("US_IT-34.1") || name.equals("US_IT-34.2") || name.equals("US_IT-34.3")) {
 					
 					request = controller.modifyMemberRoles(member, getRolebyCMD(event, role_cmd), role);
@@ -245,16 +256,21 @@ public class Main2 extends ListenerAdapter{
 		
 	}
 	
+	/**
+	 * Workaround für die Tatsache das nicht jeder Befehl seiner Rolle entspricht (z.B. FISI für Systemintegrator)
+	 * 
+	 * @param event
+	 * @param cmd
+	 * @return
+	 */
 	public Role getRolebyCMD( MessageReceivedEvent event, String cmd) {
 
 		List<Role> serverRoles = event.getGuild().getRoles();
 		
 		Hashtable<String, Role> serverrollenbyName = new Hashtable<String, Role>();
 		
-		//Rollen aus Rollennamen beziehen
+		//Rollen aus Rollennamen beziehen und unter ihrem Befehl(Key) erhalten
 		for (Role i : serverRoles) {
-			
-			System.out.println(i.getName());
 			
 			switch (i.getName()) {
 			
